@@ -1,0 +1,92 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { adjustDateForPST } from '../utils/dateUtils';
+
+export interface Props {
+  blogmark: CollectionEntry<'blogmarks'>;
+}
+
+const { blogmark } = Astro.props;
+const { Content } = await blogmark.render();
+
+// Use the full slug as-is (includes date prefix)
+const slug = blogmark.slug;
+
+// Adjust date for PST to ensure correct URL generation
+const date = adjustDateForPST(blogmark.data.created);
+
+const url = `/${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${slug}/`;
+
+const domain = new URL(blogmark.data.linkUrl).hostname;
+---
+
+<div class="blogmark segment">
+  <p>
+    <strong><a href={blogmark.data.linkUrl}>{blogmark.data.linkTitle}</a></strong>
+    <span class="domain">({domain})</span>
+    {blogmark.data.viaUrl && (
+      <span class="via">
+        (<a href={blogmark.data.viaUrl} title={blogmark.data.viaTitle}>via</a>)
+      </span>
+    )}
+  </p>
+  <div class="commentary">
+    <Content />
+  </div>
+  <div class="entry-footer">
+    <a href={url} class="permalink">#</a>
+    {blogmark.data.tags.length > 0 && (
+      <span class="tags">
+        {blogmark.data.tags.map(tag => (
+          <a href={`/tags/${tag}/`} class="tag">{tag}</a>
+        ))}
+      </span>
+    )}
+  </div>
+</div>
+
+<style>
+  .blogmark {
+    margin-bottom: 2rem;
+  }
+
+  .blogmark strong a {
+    color: #333;
+  }
+
+  .domain {
+    color: #666;
+    font-size: 0.9rem;
+  }
+
+  .via {
+    font-size: 0.9rem;
+  }
+
+  .commentary {
+    margin: 0.5rem 0;
+  }
+
+  .entry-footer {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: #666;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .permalink {
+    color: #999;
+    text-decoration: none;
+  }
+
+  .tags {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .tag {
+    color: #720e9e;
+  }
+</style>

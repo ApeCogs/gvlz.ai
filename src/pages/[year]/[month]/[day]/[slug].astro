@@ -1,0 +1,442 @@
+---
+import { getCollection } from 'astro:content';
+import PostLayout from '../../../../layouts/PostLayout.astro';
+import type { GetStaticPaths } from 'astro';
+import { adjustDateForPST } from '../../../../utils/dateUtils';
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const entries = await getCollection('entries');
+  const blogmarks = await getCollection('blogmarks');
+  const quotations = await getCollection('quotations');
+  const notes = await getCollection('notes');
+
+  const allContent = [...entries, ...blogmarks, ...quotations, ...notes];
+
+  // Calculate tag counts
+  const tagCounts = new Map<string, number>();
+  allContent.forEach(item => {
+    item.data.tags?.forEach((tag: string) => {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    });
+  });
+
+  // Sort content once, outside the map
+  const sortedContent = [...allContent].sort((a, b) => b.data.created.getTime() - a.data.created.getTime());
+
+  return allContent.map((item, index) => {
+    // Adjust date for PST to ensure correct URL generation
+    const date = adjustDateForPST(item.data.created);
+    
+    // Find next and previous entries
+    const currentIndex = sortedContent.findIndex(c => c.id === item.id);
+    const nextEntry = currentIndex > 0 ? sortedContent[currentIndex - 1] : null;
+    const prevEntry = currentIndex < sortedContent.length - 1 ? sortedContent[currentIndex + 1] : null;
+    
+    // Use the full slug as-is
+    const slug = item.slug;
+    
+    return {
+      params: {
+        year: date.getFullYear().toString(),
+        month: (date.getMonth() + 1).toString().padStart(2, '0'),
+        day: date.getDate().toString().padStart(2, '0'),
+        slug: slug,
+      },
+      props: { 
+        item, 
+        collection: item.collection,
+        tagCounts: Object.fromEntries(tagCounts),
+        nextEntry,
+        prevEntry
+      },
+    };
+  });
+};
+
+const { item, collection, tagCounts, nextEntry, prevEntry } = Astro.props;
+const { Content } = await item.render();
+
+// Use full slugs for navigation (including date prefix)
+const nextSlug = nextEntry ? nextEntry.slug : '';
+const prevSlug = prevEntry ? prevEntry.slug : '';
+
+// Generate URLs for navigation with PST-adjusted dates
+const nextDate = nextEntry ? adjustDateForPST(nextEntry.data.created) : null;
+const prevDate = prevEntry ? adjustDateForPST(prevEntry.data.created) : null;
+
+const nextUrl = nextEntry && nextDate ? `/${nextDate.getFullYear()}/${(nextDate.getMonth() + 1).toString().padStart(2, '0')}/${nextDate.getDate().toString().padStart(2, '0')}/${nextSlug}/` : '';
+const prevUrl = prevEntry && prevDate ? `/${prevDate.getFullYear()}/${(prevDate.getMonth() + 1).toString().padStart(2, '0')}/${prevDate.getDate().toString().padStart(2, '0')}/${prevSlug}/` : '';
+
+// Determine the title based on content type
+let title = '';
+if (collection === 'entries') {
+  title = item.data.title;
+} else if (collection === 'blogmarks') {
+  title = item.data.linkTitle;
+} else if (collection === 'quotations') {
+  title = `Quote from ${item.data.source}`;
+} else if (collection === 'notes') {
+  title = item.data.title || 'Note';
+}
+---
+
+<PostLayout title={`${title} - GVLZ.ai`}>
+  <article slot="content" class={`${collection}-page`}>
+      {collection === 'entries' && (
+        <>
+          <h1>{item.data.title}</h1>
+
+          <div class="content">
+            <Content />
+          </div>
+        </>
+      )}
+
+      {collection === 'blogmarks' && (
+        <>
+          <h1>
+            <a href={item.data.linkUrl}>{item.data.linkTitle}</a>
+          </h1>
+          <div class="meta">
+            <span class="domain">({new URL(item.data.linkUrl).hostname})</span>
+            {item.data.viaUrl && (
+              <span class="via">
+                via <a href={item.data.viaUrl}>{item.data.viaTitle || 'source'}</a>
+              </span>
+            )}
+          </div>
+          <div class="content">
+            <Content />
+          </div>
+        </>
+      )}
+
+      {collection === 'quotations' && (
+        <>
+          <blockquote class="main-quote">
+            <Content />
+          </blockquote>
+          <div class="meta">
+            <p class="source">
+              — {item.data.sourceUrl ? (
+                <a href={item.data.sourceUrl}>{item.data.source}</a>
+              ) : (
+                item.data.source
+              )}
+              {item.data.context && (
+                <span class="context">, {item.data.context}</span>
+              )}
+            </p>
+            <time datetime={item.data.created.toISOString()}>
+              {item.data.created.toLocaleDateString('en-US', { 
+                month: 'long', 
+                day: 'numeric', 
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+              })}
+            </time>
+            {item.data.tags.length > 0 && (
+              <span class="tags">
+                {item.data.tags.map(tag => (
+                  <a href={`/tags/${tag}/`} class="tag">{tag}</a>
+                ))}
+              </span>
+            )}
+          </div>
+        </>
+      )}
+
+      {collection === 'notes' && (
+        <>
+          {item.data.title && <h1>{item.data.title}</h1>}
+          <div class="meta">
+            <time datetime={item.data.created.toISOString()}>
+              {item.data.created.toLocaleDateString('en-US', { 
+                month: 'long', 
+                day: 'numeric', 
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+              })}
+            </time>
+            {item.data.tags.length > 0 && (
+              <span class="tags">
+                {item.data.tags.map(tag => (
+                  <a href={`/tags/${tag}/`} class="tag">{tag}</a>
+                ))}
+              </span>
+            )}
+          </div>
+          <div class="content note-content">
+            <Content />
+          </div>
+        </>
+      )}
+    </article>
+
+  <div slot="sidebar">
+    {collection === 'entries' && (
+      <>
+        <div class="sidebar-info">
+          This is <strong>{item.data.title}</strong> by Gabriel Velazquez Lopez, posted on{' '}
+          <a href={`/${item.data.created.getFullYear()}/${(item.data.created.getMonth() + 1).toString().padStart(2, '0')}/${item.data.created.getDate().toString().padStart(2, '0')}/`}>
+            {item.data.created.toLocaleDateString('en-US', { 
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            })}
+          </a>.
+        </div>
+
+        {item.data.series && (
+          <div class="series-box">
+            <h4>Part of series "{item.data.series}"</h4>
+            <p>This post is part of a series.</p>
+          </div>
+        )}
+
+        {item.data.tags.length > 0 && (
+          <div class="sidebar-tags">
+            {item.data.tags.map(tag => (
+              <a href={`/tags/${tag}/`} class="sidebar-tag">
+                {tag} <span class="tag-count">{tagCounts[tag]}</span>
+              </a>
+            ))}
+          </div>
+        )}
+        
+        <div class="sidebar-nav">
+          {nextEntry && (
+            <div class="nav-item">
+              <strong>Next:</strong>{' '}
+              <a href={nextUrl}>
+                {nextEntry.collection === 'entries' ? nextEntry.data.title : 
+                 nextEntry.collection === 'blogmarks' ? nextEntry.data.linkTitle :
+                 nextEntry.collection === 'quotations' ? `Quote from ${nextEntry.data.source}` :
+                 nextEntry.data.title || 'Note'}
+              </a>
+            </div>
+          )}
+          {prevEntry && (
+            <div class="nav-item">
+              <strong>Previous:</strong>{' '}
+              <a href={prevUrl}>
+                {prevEntry.collection === 'entries' ? prevEntry.data.title : 
+                 prevEntry.collection === 'blogmarks' ? prevEntry.data.linkTitle :
+                 prevEntry.collection === 'quotations' ? `Quote from ${prevEntry.data.source}` :
+                 prevEntry.data.title || 'Note'}
+              </a>
+            </div>
+          )}
+        </div>
+      </>
+    )}
+  </div>
+</PostLayout>
+
+<style>
+  article {
+    max-width: 65ch;
+  }
+
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    line-height: 1.2;
+  }
+
+  .sidebar-info {
+    padding: 1rem;
+    background: #f8f8f8;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+  }
+
+  .sidebar-info strong {
+    color: #333;
+  }
+
+  .sidebar-info a {
+    color: #720e9e;
+    text-decoration: none;
+  }
+
+  .sidebar-info a:hover {
+    text-decoration: underline;
+  }
+
+  .series-box {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f0e6ff;
+    border-left: 3px solid #720e9e;
+    border-radius: 4px;
+  }
+
+  .series-box h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    color: #720e9e;
+  }
+
+  .series-box p {
+    margin: 0;
+    color: #666;
+    font-size: 0.85rem;
+  }
+
+  .sidebar-tags {
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .sidebar-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    background: #8b5cf6;
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    border-radius: 6px;
+    color: white;
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+
+  .sidebar-tag:hover {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
+
+  .sidebar-tag .tag-count {
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.1rem 0.4rem;
+    border-radius: 10px;
+  }
+
+  .sidebar-nav {
+    padding-top: 1rem;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  .nav-item {
+    margin-bottom: 0.8rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  .nav-item strong {
+    display: block;
+    color: #666;
+    font-size: 0.85rem;
+    margin-bottom: 0.2rem;
+  }
+
+  .nav-item a {
+    color: #720e9e;
+    text-decoration: none;
+  }
+
+  .nav-item a:hover {
+    text-decoration: underline;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    color: #666;
+    font-size: 0.95rem;
+  }
+
+  .tags {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .tag {
+    color: #720e9e;
+    padding: 0.25rem 0.5rem;
+    background: #f0f0f0;
+    border-radius: 4px;
+  }
+
+  .content {
+    line-height: 1.7;
+  }
+
+  .content :global(p) {
+    margin-bottom: 1rem;
+  }
+
+  .content :global(h2) {
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+  }
+
+  .content :global(pre) {
+    background: #f4f4f4;
+    padding: 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+  }
+
+  .main-quote {
+    font-size: 1.5rem;
+    font-style: italic;
+    margin: 2rem 0;
+    position: relative;
+    padding: 1rem 3rem;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  .main-quote::before,
+  .main-quote::after {
+    color: #720e9e;
+    font-size: 4rem;
+    position: absolute;
+    font-family: Georgia, 'Times New Roman', serif;
+    line-height: 0.8;
+  }
+
+  .main-quote::before {
+    content: "\201C";
+    top: 0;
+    left: 0;
+  }
+
+  .main-quote::after {
+    content: "\201D";
+    bottom: -1rem;
+    right: 0;
+  }
+
+  .source {
+    font-size: 1.1rem;
+    color: #666;
+  }
+
+  .note-content {
+    font-size: 1.1rem;
+  }
+
+  .domain {
+    color: #999;
+  }
+
+  .via {
+    font-style: italic;
+  }
+</style>

@@ -1,0 +1,105 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { adjustDateForPST } from '../utils/dateUtils';
+
+export interface Props {
+  entry: CollectionEntry<'entries'>;
+}
+
+const { entry } = Astro.props;
+const { Content } = await entry.render();
+
+// Use the full slug as-is (includes date prefix)
+const slug = entry.slug;
+
+// Adjust date for PST to ensure correct URL generation
+const date = adjustDateForPST(entry.data.created);
+
+const url = `/${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${slug}/`;
+
+const wordCount = entry.body.split(/\s+/).length;
+const showTruncated = wordCount > 200;
+
+// Get first paragraph for truncation
+const firstParagraphMatch = entry.body.match(/^(.*?)(\n\n|$)/s);
+const truncatedText = firstParagraphMatch ? firstParagraphMatch[1] : entry.body.substring(0, 300);
+---
+
+<div class="entry segment">
+  <h3><a href={url}>{entry.data.title}</a></h3>
+  {showTruncated ? (
+    <div class="truncated">
+      <p>{truncatedText}</p>
+      <a href={url} class="word-count">[... {wordCount} words]</a>
+    </div>
+  ) : (
+    <Content />
+  )}
+  <div class="entry-footer">
+    <a href={url} class="permalink">#</a>
+    {entry.data.tags.length > 0 && (
+      <span class="tags">
+        {entry.data.tags.map(tag => (
+          <a href={`/tags/${tag}/`} class="tag">{tag}</a>
+        ))}
+      </span>
+    )}
+  </div>
+</div>
+
+<style>
+  .entry {
+    margin-bottom: 3rem;
+  }
+
+  .entry h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    font-weight: normal;
+  }
+
+  .entry h3 a {
+    color: #333;
+  }
+
+  .truncated {
+    position: relative;
+  }
+
+  .truncated p {
+    margin-bottom: 0.5rem;
+  }
+
+  .word-count {
+    font-size: 0.9em;
+    color: #720e9e;
+    text-decoration: none;
+  }
+
+  .word-count:hover {
+    text-decoration: underline;
+  }
+
+  .entry-footer {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: #666;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .permalink {
+    color: #999;
+    text-decoration: none;
+  }
+
+  .tags {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .tag {
+    color: #720e9e;
+  }
+</style>

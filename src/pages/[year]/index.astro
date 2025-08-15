@@ -1,0 +1,171 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import EntryItem from '../../components/EntryItem.astro';
+import BlogmarkItem from '../../components/BlogmarkItem.astro';
+import NoteItem from '../../components/NoteItem.astro';
+import QuotationItem from '../../components/QuotationItem.astro';
+import type { GetStaticPaths } from 'astro';
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const entries = await getCollection('entries', ({ data }) => !data.isDraft);
+  const blogmarks = await getCollection('blogmarks', ({ data }) => !data.isDraft);
+  const notes = await getCollection('notes', ({ data }) => !data.isDraft);
+  const quotations = await getCollection('quotations', ({ data }) => !data.isDraft);
+
+  // Combine all content
+  const allContent = [...entries, ...blogmarks, ...notes, ...quotations];
+
+  // Group by year
+  const yearGroups = new Map();
+  allContent.forEach(item => {
+    const date = item.data.created;
+    const year = date.getFullYear().toString();
+    
+    if (!yearGroups.has(year)) {
+      yearGroups.set(year, {
+        year: year,
+        items: []
+      });
+    }
+    
+    yearGroups.get(year).items.push({
+      type: item.collection,
+      item: item,
+      date: date
+    });
+  });
+
+  return Array.from(yearGroups.values()).map(group => ({
+    params: {
+      year: group.year
+    },
+    props: {
+      items: group.items.sort((a, b) => b.date.getTime() - a.date.getTime()),
+      year: group.year
+    }
+  }));
+};
+
+const { items, year } = Astro.props;
+
+// Group items by month for display
+const monthGroups = new Map();
+items.forEach(({ type, item, date }) => {
+  const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+  const monthName = date.toLocaleDateString('en-US', { month: 'long' });
+  
+  if (!monthGroups.has(monthKey)) {
+    monthGroups.set(monthKey, {
+      name: monthName,
+      month: (date.getMonth() + 1).toString().padStart(2, '0'),
+      items: []
+    });
+  }
+  
+  monthGroups.get(monthKey).items.push({ type, item, date });
+});
+
+// Sort months in reverse chronological order
+const sortedMonths = Array.from(monthGroups.entries())
+  .sort((a, b) => b[0].localeCompare(a[0]));
+---
+
+<BaseLayout title={`Posts from ${year} - GVLZ.ai`}>
+  <Fragment slot="band-content">
+    <h2>Posts from {year}</h2>
+  </Fragment>
+
+  <div id="primary">
+    {sortedMonths.map(([monthKey, monthData]) => (
+      <div class="month-section">
+        <h3 class="month-header">
+          <a href={`/${year}/${monthData.month}/`}>{monthData.name} {year}</a>
+          <span class="post-count">({monthData.items.length} post{monthData.items.length !== 1 ? 's' : ''})</span>
+        </h3>
+        {monthData.items.map(({ type, item }) => {
+          if (type === 'entries') {
+            return <EntryItem entry={item} />;
+          } else if (type === 'blogmarks') {
+            return <BlogmarkItem blogmark={item} />;
+          } else if (type === 'notes') {
+            return <NoteItem note={item} />;
+          } else if (type === 'quotations') {
+            return <QuotationItem quotation={item} />;
+          }
+        })}
+      </div>
+    ))}
+    
+    {items.length === 0 && (
+      <p>No posts for this year.</p>
+    )}
+  </div>
+
+  <div id="secondary">
+    <h3>Archive Navigation</h3>
+    <ul class="nav-list">
+      <li><a href="/">← Back to Home</a></li>
+      <li><a href="/archive/">Browse Full Archive</a></li>
+    </ul>
+    
+    <h3>Months in {year}</h3>
+    <ul class="month-list">
+      {sortedMonths.map(([monthKey, monthData]) => (
+        <li>
+          <a href={`/${year}/${monthData.month}/`}>
+            {monthData.name} ({monthData.items.length})
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+</BaseLayout>
+
+<style>
+  .month-section {
+    margin-bottom: 3rem;
+  }
+
+  .month-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #720e9e;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+  }
+
+  .month-header a {
+    color: #720e9e;
+    text-decoration: none;
+  }
+
+  .month-header a:hover {
+    text-decoration: underline;
+  }
+
+  .post-count {
+    font-size: 0.9rem;
+    color: #666;
+  }
+
+  .nav-list, .month-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .nav-list li, .month-list li {
+    margin-bottom: 0.5rem;
+  }
+
+  .month-list a {
+    color: #720e9e;
+    text-decoration: none;
+  }
+
+  .month-list a:hover {
+    text-decoration: underline;
+  }
+</style>

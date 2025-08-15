@@ -1,0 +1,22 @@
+{
+  "name": "gvlz-website",
+  "version": "1.0.0",
+  "description": "A personal blog website built with Astro, deployed to Vercel, and inspired by Simon Willison's blog design.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@astrojs/rss": "^4.0.12",
+    "astro": "^5.12.9",
+    "typescript": "^5.9.2"
+  }
+}

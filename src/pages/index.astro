@@ -1,0 +1,134 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import EntryItem from '../components/EntryItem.astro';
+import BlogmarkItem from '../components/BlogmarkItem.astro';
+import NoteItem from '../components/NoteItem.astro';
+import QuotationItem from '../components/QuotationItem.astro';
+import { adjustDateForPST } from '../utils/dateUtils';
+
+// Get all content
+const entries = await getCollection('entries', ({ data }) => !data.isDraft);
+const blogmarks = await getCollection('blogmarks', ({ data }) => !data.isDraft);
+const notes = await getCollection('notes', ({ data }) => !data.isDraft);
+const quotations = await getCollection('quotations', ({ data }) => !data.isDraft);
+
+// Combine and sort by date (adjust dates for PST)
+const allContent = [
+  ...entries.map(e => ({ type: 'entry', item: e, date: adjustDateForPST(e.data.created) })),
+  ...blogmarks.map(b => ({ type: 'blogmark', item: b, date: adjustDateForPST(b.data.created) })),
+  ...notes.map(n => ({ type: 'note', item: n, date: adjustDateForPST(n.data.created) })),
+  ...quotations.map(q => ({ type: 'quotation', item: q, date: adjustDateForPST(q.data.created) })),
+].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+// Group content by date
+const groupedContent = allContent.reduce((groups, content) => {
+  const dateKey = content.date.toLocaleDateString('en-US', { 
+    weekday: 'long',
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+  
+  if (!groups[dateKey]) {
+    groups[dateKey] = [];
+  }
+  groups[dateKey].push(content);
+  return groups;
+}, {} as Record<string, typeof allContent>);
+
+// Get highlights (just the latest entries for now)
+const highlights = entries.slice(0, 5);
+---
+
+<BaseLayout>
+  <Fragment slot="band-content">
+    <h2>Recent</h2>
+    <h2 class="highlights-heading">Highlights</h2>
+  </Fragment>
+
+  <div id="primary">    
+    {Object.entries(groupedContent).map(([date, posts]) => (
+      <>
+        <h3 class="date-header">{date}</h3>
+        {posts.map(({ type, item }) => {
+          if (type === 'entry') {
+            return <EntryItem entry={item} />;
+          } else if (type === 'blogmark') {
+            return <BlogmarkItem blogmark={item} />;
+          } else if (type === 'note') {
+            return <NoteItem note={item} />;
+          } else if (type === 'quotation') {
+            return <QuotationItem quotation={item} />;
+          }
+        })}
+      </>
+    ))}
+  </div>
+
+  <div id="secondary">
+    <ul class="highlights">
+      {highlights.map(entry => (
+        <li>
+          <a href={`/${entry.data.created.getFullYear()}/${(entry.data.created.getMonth() + 1).toString().padStart(2, '0')}/${entry.data.created.getDate().toString().padStart(2, '0')}/${entry.slug}/`}>
+            {entry.data.title}
+          </a>
+          <span class="date">
+            {entry.data.created.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </span>
+        </li>
+      ))}
+    </ul>
+  </div>
+</BaseLayout>
+
+<style>
+  .highlights {
+    list-style: none;
+    padding: 0;
+  }
+
+  .highlights li {
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .highlights .date {
+    font-size: 0.85rem;
+    color: #666;
+  }
+
+  #primary :global(.segment) {
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 2rem;
+    margin-bottom: 2rem;
+  }
+
+  #primary :global(.segment:last-child) {
+    border-bottom: none;
+  }
+
+  .date-header {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #666;
+    margin: 2.5rem 0 1.5rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #720e9e;
+  }
+
+  .date-header:first-child {
+    margin-top: 0;
+  }
+
+  @media (max-width: 768px) {
+    .highlights-heading {
+      display: none;
+    }
+    
+    #secondary {
+      display: none;
+    }
+  }
+</style>

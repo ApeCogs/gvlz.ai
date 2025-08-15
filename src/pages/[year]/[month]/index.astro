@@ -1,0 +1,188 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import EntryItem from '../../../components/EntryItem.astro';
+import BlogmarkItem from '../../../components/BlogmarkItem.astro';
+import NoteItem from '../../../components/NoteItem.astro';
+import QuotationItem from '../../../components/QuotationItem.astro';
+import type { GetStaticPaths } from 'astro';
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const entries = await getCollection('entries', ({ data }) => !data.isDraft);
+  const blogmarks = await getCollection('blogmarks', ({ data }) => !data.isDraft);
+  const notes = await getCollection('notes', ({ data }) => !data.isDraft);
+  const quotations = await getCollection('quotations', ({ data }) => !data.isDraft);
+
+  // Combine all content
+  const allContent = [...entries, ...blogmarks, ...notes, ...quotations];
+
+  // Group by year and month
+  const monthGroups = new Map();
+  allContent.forEach(item => {
+    const date = item.data.created;
+    const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+    if (!monthGroups.has(monthKey)) {
+      monthGroups.set(monthKey, {
+        year: date.getFullYear().toString(),
+        month: (date.getMonth() + 1).toString().padStart(2, '0'),
+        monthName: date.toLocaleDateString('en-US', { month: 'long' }),
+        items: []
+      });
+    }
+    
+    monthGroups.get(monthKey).items.push({
+      type: item.collection,
+      item: item,
+      date: date
+    });
+  });
+
+  return Array.from(monthGroups.values()).map(group => ({
+    params: {
+      year: group.year,
+      month: group.month
+    },
+    props: {
+      items: group.items.sort((a, b) => b.date.getTime() - a.date.getTime()),
+      year: group.year,
+      month: group.month,
+      monthName: group.monthName
+    }
+  }));
+};
+
+const { items, year, month, monthName } = Astro.props;
+
+// Group items by day for display
+const dayGroups = new Map();
+items.forEach(({ type, item, date }) => {
+  const day = date.getDate().toString().padStart(2, '0');
+  const dayKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${day}`;
+  
+  if (!dayGroups.has(dayKey)) {
+    dayGroups.set(dayKey, {
+      day: day,
+      date: date,
+      items: []
+    });
+  }
+  
+  dayGroups.get(dayKey).items.push({ type, item, date });
+});
+
+// Sort days in reverse chronological order
+const sortedDays = Array.from(dayGroups.entries())
+  .sort((a, b) => b[0].localeCompare(a[0]));
+---
+
+<BaseLayout title={`Posts from ${monthName} ${year} - GVLZ.ai`}>
+  <Fragment slot="band-content">
+    <h2>Posts from {monthName} {year}</h2>
+  </Fragment>
+
+  <div id="primary">
+    {sortedDays.map(([dayKey, dayData]) => (
+      <div class="day-section">
+        <h3 class="day-header">
+          <a href={`/${year}/${month}/${dayData.day}/`}>
+            {dayData.date.toLocaleDateString('en-US', { 
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric'
+            })}
+          </a>
+          <span class="post-count">({dayData.items.length} post{dayData.items.length !== 1 ? 's' : ''})</span>
+        </h3>
+        {dayData.items.map(({ type, item }) => {
+          if (type === 'entries') {
+            return <EntryItem entry={item} />;
+          } else if (type === 'blogmarks') {
+            return <BlogmarkItem blogmark={item} />;
+          } else if (type === 'notes') {
+            return <NoteItem note={item} />;
+          } else if (type === 'quotations') {
+            return <QuotationItem quotation={item} />;
+          }
+        })}
+      </div>
+    ))}
+    
+    {items.length === 0 && (
+      <p>No posts for this month.</p>
+    )}
+  </div>
+
+  <div id="secondary">
+    <h3>Archive Navigation</h3>
+    <ul class="nav-list">
+      <li><a href="/">← Back to Home</a></li>
+      <li><a href={`/${year}/`}>← All of {year}</a></li>
+      <li><a href="/archive/">Browse Full Archive</a></li>
+    </ul>
+    
+    <h3>Days in {monthName} {year}</h3>
+    <ul class="day-list">
+      {sortedDays.map(([dayKey, dayData]) => (
+        <li>
+          <a href={`/${year}/${month}/${dayData.day}/`}>
+            {dayData.date.toLocaleDateString('en-US', { 
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric'
+            })} ({dayData.items.length})
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+</BaseLayout>
+
+<style>
+  .day-section {
+    margin-bottom: 2.5rem;
+  }
+
+  .day-header {
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+  }
+
+  .day-header a {
+    color: #720e9e;
+    text-decoration: none;
+  }
+
+  .day-header a:hover {
+    text-decoration: underline;
+  }
+
+  .post-count {
+    font-size: 0.85rem;
+    color: #666;
+  }
+
+  .nav-list, .day-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .nav-list li, .day-list li {
+    margin-bottom: 0.5rem;
+  }
+
+  .day-list a {
+    color: #720e9e;
+    text-decoration: none;
+  }
+
+  .day-list a:hover {
+    text-decoration: underline;
+  }
+</style>

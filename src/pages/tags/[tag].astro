@@ -1,0 +1,100 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import EntryItem from '../../components/EntryItem.astro';
+import BlogmarkItem from '../../components/BlogmarkItem.astro';
+import QuotationItem from '../../components/QuotationItem.astro';
+import NoteItem from '../../components/NoteItem.astro';
+import type { GetStaticPaths } from 'astro';
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const entries = await getCollection('entries', ({ data }) => !data.isDraft);
+  const blogmarks = await getCollection('blogmarks', ({ data }) => !data.isDraft);
+  const quotations = await getCollection('quotations', ({ data }) => !data.isDraft);
+  const notes = await getCollection('notes', ({ data }) => !data.isDraft);
+
+  // Get all unique tags
+  const allTags = new Set<string>();
+  [...entries, ...blogmarks, ...quotations, ...notes].forEach(item => {
+    item.data.tags.forEach(tag => allTags.add(tag));
+  });
+
+  return Array.from(allTags).map(tag => ({
+    params: { tag },
+    props: { 
+      tag,
+      entries: entries.filter(e => e.data.tags.includes(tag)),
+      blogmarks: blogmarks.filter(b => b.data.tags.includes(tag)),
+      quotations: quotations.filter(q => q.data.tags.includes(tag)),
+      notes: notes.filter(n => n.data.tags.includes(tag)),
+    }
+  }));
+};
+
+const { tag, entries, blogmarks, quotations, notes } = Astro.props;
+
+// Combine and sort all content for this tag
+const allContent = [
+  ...entries.map(e => ({ type: 'entry', item: e, date: e.data.created })),
+  ...blogmarks.map(b => ({ type: 'blogmark', item: b, date: b.data.created })),
+  ...notes.map(n => ({ type: 'note', item: n, date: n.data.created })),
+  ...quotations.map(q => ({ type: 'quotation', item: q, date: q.data.created })),
+].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+const totalCount = allContent.length;
+---
+
+<BaseLayout title={`Tag: ${tag} - GVLZ.ai`}>
+  <div id="primary">
+    <h1>Tag: {tag}</h1>
+    <p class="tag-stats">{totalCount} item{totalCount !== 1 ? 's' : ''} tagged with "{tag}"</p>
+    
+    {allContent.map(({ type, item }) => {
+      if (type === 'entry') {
+        return <EntryItem entry={item} />;
+      } else if (type === 'blogmark') {
+        return <BlogmarkItem blogmark={item} />;
+      } else if (type === 'note') {
+        return <NoteItem note={item} />;
+      } else if (type === 'quotation') {
+        return <QuotationItem quotation={item} />;
+      }
+    })}
+  </div>
+
+  <div id="secondary">
+    <h3>Navigation</h3>
+    <ul>
+      <li><a href="/">← Back to Home</a></li>
+      <li><a href="/tags/">All Tags</a></li>
+    </ul>
+
+    <h3>Related Tags</h3>
+    <div class="related-tags">
+      <!-- This would show related tags based on co-occurrence -->
+      <p class="coming-soon">Coming soon...</p>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  h1 {
+    margin-bottom: 0.5rem;
+  }
+
+  .tag-stats {
+    color: #666;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #f0f0f0;
+  }
+
+  .related-tags {
+    margin-top: 1rem;
+  }
+
+  .coming-soon {
+    color: #999;
+    font-style: italic;
+  }
+</style>

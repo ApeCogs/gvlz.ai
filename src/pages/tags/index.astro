@@ -1,0 +1,88 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+// Get all content and extract tags
+const entries = await getCollection('entries', ({ data }) => !data.isDraft);
+const blogmarks = await getCollection('blogmarks', ({ data }) => !data.isDraft);
+const quotations = await getCollection('quotations', ({ data }) => !data.isDraft);
+const notes = await getCollection('notes', ({ data }) => !data.isDraft);
+
+// Count tags across all content types
+const tagCounts = new Map<string, number>();
+
+[...entries, ...blogmarks, ...quotations, ...notes].forEach(item => {
+  item.data.tags.forEach(tag => {
+    tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+  });
+});
+
+// Sort tags by count
+const sortedTags = Array.from(tagCounts.entries())
+  .sort((a, b) => b[1] - a[1]);
+---
+
+<BaseLayout title="All Tags - GVLZ.ai">
+  <div id="primary">
+    <h1>All Tags</h1>
+    
+    <div class="tag-cloud">
+      {sortedTags.map(([tag, count]) => (
+        <a href={`/tags/${tag}/`} class="tag-item">
+          <span class="tag-name">{tag}</span>
+          <span class="tag-count">{count}</span>
+        </a>
+      ))}
+    </div>
+  </div>
+
+  <div id="secondary">
+    <h3>Navigation</h3>
+    <ul>
+      <li><a href="/">← Back to Home</a></li>
+    </ul>
+  </div>
+</BaseLayout>
+
+<style>
+  h1 {
+    margin-bottom: 2rem;
+  }
+
+  .tag-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .tag-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #f0f0f0;
+    border-radius: 20px;
+    transition: all 0.2s;
+  }
+
+  .tag-item:hover {
+    background: #720e9e;
+    color: white;
+    text-decoration: none;
+  }
+
+  .tag-name {
+    font-weight: 500;
+  }
+
+  .tag-count {
+    background: rgba(114, 14, 158, 0.2);
+    padding: 0.1rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+  }
+
+  .tag-item:hover .tag-count {
+    background: rgba(255, 255, 255, 0.3);
+  }
+</style>

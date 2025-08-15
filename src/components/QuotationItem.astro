@@ -1,0 +1,131 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { adjustDateForPST } from '../utils/dateUtils';
+
+export interface Props {
+  quotation: CollectionEntry<'quotations'>;
+}
+
+const { quotation } = Astro.props;
+const { Content } = await quotation.render();
+
+// Use the full slug as-is (includes date prefix)
+const slug = quotation.slug;
+
+// Adjust date for PST to ensure correct URL generation
+const date = adjustDateForPST(quotation.data.created);
+
+const url = `/${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${slug}/`;
+---
+
+<div class="quotation segment">
+  <blockquote class="quote-block">
+    <div class="quote-content">
+      <Content />
+    </div>
+  </blockquote>
+  <p class="cite">
+    — {quotation.data.sourceUrl ? (
+      <a href={quotation.data.sourceUrl}>{quotation.data.source}</a>
+    ) : (
+      quotation.data.source
+    )}
+    {quotation.data.context && (
+      <span class="context">, {quotation.data.context}</span>
+    )}
+  </p>
+  <div class="entry-footer">
+    <a href={url} class="permalink">#</a>
+    {quotation.data.tags.length > 0 && (
+      <span class="tags">
+        {quotation.data.tags.map(tag => (
+          <a href={`/tags/${tag}/`} class="tag">{tag}</a>
+        ))}
+      </span>
+    )}
+  </div>
+</div>
+
+<style>
+  .quotation {
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .quote-block {
+    margin: 0;
+    position: relative;
+    padding: 1.5rem 0;
+  }
+
+  .quote-block::before,
+  .quote-block::after {
+    color: #720e9e;
+    font-size: 3rem;
+    position: absolute;
+    font-family: Georgia, 'Times New Roman', serif;
+    line-height: 0.8;
+    font-weight: bold;
+  }
+
+  .quote-block::before {
+    content: "\201C";
+    top: 0;
+    left: 0;
+  }
+
+  .quote-block::after {
+    content: "\201D";
+    bottom: 0;
+    right: 0;
+  }
+
+  .quote-content {
+    font-size: 1.1rem;
+    font-style: italic;
+    color: #333;
+    font-family: Georgia, 'Times New Roman', serif;
+    line-height: 1.6;
+    text-align: left;
+    padding: 0 3rem;
+    display: block;
+    position: relative;
+  }
+
+  .quote-content :global(p) {
+    margin: 0;
+    display: inline;
+  }
+
+  .cite {
+    margin-top: 1rem;
+    color: #666;
+  }
+
+  .context {
+    font-style: italic;
+  }
+
+  .entry-footer {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: #666;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .permalink {
+    color: #999;
+    text-decoration: none;
+  }
+
+  .tags {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .tag {
+    color: #720e9e;
+  }
+</style>

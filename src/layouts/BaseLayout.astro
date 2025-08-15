@@ -1,0 +1,312 @@
+---
+import { getCollection } from 'astro:content';
+
+export interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title = "Gabriel Velazquez Lopez's Blog", description = "Personal blog about technology, programming, and thoughts" } = Astro.props;
+
+// Get all content to extract tags
+const entries = await getCollection('entries', ({ data }) => !data.isDraft);
+const blogmarks = await getCollection('blogmarks', ({ data }) => !data.isDraft);
+const notes = await getCollection('notes', ({ data }) => !data.isDraft);
+const quotations = await getCollection('quotations', ({ data }) => !data.isDraft);
+
+// Extract and count all tags
+const tagCounts = new Map<string, number>();
+[...entries, ...blogmarks, ...notes, ...quotations].forEach(item => {
+  item.data.tags.forEach((tag: string) => {
+    tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+  });
+});
+
+// Get top 5 tags (with stable sort for ties)
+const topTags = Array.from(tagCounts.entries())
+  .sort((a, b) => {
+    // First sort by count (descending)
+    if (b[1] !== a[1]) return b[1] - a[1];
+    // Then alphabetically for ties
+    return a[0].localeCompare(b[0]);
+  })
+  .slice(0, 5);
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content={description} />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <title>{title}</title>
+    <link rel="alternate" type="application/atom+xml" title="GVLZ.ai - Atom Feed" href="/atom/everything.xml" />
+    <link href="https://github.com/gvlz" rel="me" />
+    <slot name="head" />
+  </head>
+  <body>
+    <div id="bighead">
+      <a id="atomfeedlink" href="/atom/everything.xml" title="My Atom feed">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14px" height="14px" viewBox="0 0 256 256">
+          <defs>
+            <linearGradient id="a" x1=".1" x2=".9" y1=".1" y2=".9">
+              <stop offset="0" stop-color="#E3702D"/>
+              <stop offset=".1" stop-color="#EA7D31"/>
+              <stop offset=".4" stop-color="#F69537"/>
+              <stop offset=".5" stop-color="#FB9E3A"/>
+              <stop offset=".7" stop-color="#EA7C31"/>
+              <stop offset=".9" stop-color="#DE642B"/>
+              <stop offset="1" stop-color="#D95B29"/>
+            </linearGradient>
+          </defs>
+          <rect width="256" height="256" fill="#CC5D15" rx="55" ry="55"/>
+          <rect width="246" height="246" x="5" y="5" fill="#F49C52" rx="50" ry="50"/>
+          <rect width="236" height="236" x="10" y="10" fill="url(#a)" rx="47" ry="47"/>
+          <circle cx="68" cy="189" r="24" fill="#FFF"/>
+          <path fill="#FFF" d="M160 213h-34a82 82 0 0 0-82-82V97a116 116 0 0 1 116 116z"/>
+          <path fill="#FFF" d="M184 213A140 140 0 0 0 44 73V38a175 175 0 0 1 175 175z"/>
+        </svg>
+      </a>
+      <div id="h1-nav-wrapper">
+        <h1>Gabriel Velazquez Lopez's Blog</h1>
+        <nav>
+          <ul>
+            <li><a href="/about/">About</a></li>
+            <li><a href="/tils/">TILs</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div id="bigheadcontainer">
+        <div class="top-tags">
+          <span>On</span>
+          {topTags.map(([tag, count]) => (
+            <a href={`/tags/${tag}/`} class="tag-link">
+              {tag} <span class="tag-count">{count}</span>
+            </a>
+          ))}
+          {tagCounts.size > 5 && (
+            <a href="/tags/" class="more-tags">...</a>
+          )}
+        </div>
+      </div>
+      <div id="searchcontainer">
+        <form action="/search/" method="GET">
+          <div>
+            <input type="search" placeholder="Search this site" class="search-input" name="q" value="" />
+            <input type="submit" class="search-submit" value="Search" />
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="band">
+      <div class="band-inner">
+        <slot name="band-content" />
+      </div>
+    </div>
+
+    <div id="wrapper">
+      <slot />
+    </div>
+
+    <style is:global>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+        line-height: 1.6;
+        color: #333;
+        background: #fff;
+      }
+
+      a {
+        color: #720e9e;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      #bighead {
+        padding: 1rem 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      #h1-nav-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        margin-bottom: 1rem;
+      }
+
+      #bighead h1 {
+        font-size: 1.8rem;
+        font-weight: normal;
+        color: #333;
+      }
+
+      #bighead nav ul {
+        display: flex;
+        list-style: none;
+        gap: 1rem;
+      }
+
+      #atomfeedlink {
+        float: right;
+        padding: 0.5rem;
+      }
+
+      #bigheadcontainer {
+        margin-bottom: 1rem;
+      }
+
+      #searchcontainer {
+        margin-bottom: 1rem;
+      }
+
+      #searchcontainer form {
+        display: flex;
+        width: 100%;
+      }
+
+      #searchcontainer form > div {
+        display: flex;
+        width: 100%;
+        gap: 0.5rem;
+      }
+
+      .search-input {
+        flex: 1;
+        max-width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 1rem;
+      }
+
+      .search-submit {
+        padding: 0.5rem 1rem;
+        background: #720e9e;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+      }
+
+      .search-submit:hover {
+        background: #5a0b7d;
+      }
+
+      #band {
+        background: linear-gradient(to top, #720e9e, #a855f7);
+        padding: 0.4rem 0;
+        margin-bottom: 2rem;
+      }
+
+      .band-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 2rem;
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 3rem;
+      }
+
+      .band-inner h2 {
+        color: white;
+        font-size: 1rem;
+        font-weight: normal;
+        margin: 0;
+      }
+
+      #wrapper {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 2rem;
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 3rem;
+        position: relative;
+      }
+
+      #primary {
+        min-width: 0;
+      }
+
+      #secondary {
+        padding-top: 0;
+      }
+
+      .top-tags {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.95rem;
+      }
+
+      .top-tags span {
+        color: #666;
+      }
+
+      .tag-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem 0.75rem;
+        background: #f0f0f0;
+        border-radius: 20px;
+        color: #333;
+        text-decoration: none;
+        transition: background 0.2s;
+      }
+
+      .tag-link:hover {
+        background: #e0e0e0;
+        text-decoration: none;
+      }
+
+      .tag-count {
+        font-size: 0.85rem;
+        color: #666;
+      }
+
+      .more-tags {
+        color: #720e9e;
+        text-decoration: none;
+        font-weight: bold;
+        padding: 0 0.5rem;
+      }
+
+      @media (max-width: 768px) {
+        #wrapper {
+          grid-template-columns: 1fr;
+        }
+
+        .band-inner {
+          grid-template-columns: 1fr;
+        }
+        
+        .band-inner h2:last-child {
+          display: none;
+        }
+
+        #h1-nav-wrapper {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        
+        #secondary {
+          display: none;
+        }
+      }
+    </style>
+  </body>
+</html>

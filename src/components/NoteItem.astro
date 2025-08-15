@@ -1,0 +1,74 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { adjustDateForPST } from '../utils/dateUtils';
+
+export interface Props {
+  note: CollectionEntry<'notes'>;
+}
+
+const { note } = Astro.props;
+const { Content } = await note.render();
+
+// Use the full slug as-is (includes date prefix)
+const slug = note.slug;
+
+// Adjust date for PST to ensure correct URL generation
+const date = adjustDateForPST(note.data.created);
+
+const url = `/${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${slug}/`;
+---
+
+<div class="note segment">
+  {note.data.title && <h4>{note.data.title}</h4>}
+  <div class="note-content">
+    <Content />
+  </div>
+  <div class="entry-footer">
+    <a href={url} class="permalink">#</a>
+    {note.data.tags.length > 0 && (
+      <span class="tags">
+        {note.data.tags.map(tag => (
+          <a href={`/tags/${tag}/`} class="tag">{tag}</a>
+        ))}
+      </span>
+    )}
+  </div>
+</div>
+
+<style>
+  .note {
+    margin-bottom: 2rem;
+  }
+
+  .note h4 {
+    margin-bottom: 0.5rem;
+    color: #333;
+  }
+
+  .note-content {
+    color: #333;
+  }
+
+  .entry-footer {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: #666;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .permalink {
+    color: #999;
+    text-decoration: none;
+  }
+
+  .tags {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .tag {
+    color: #720e9e;
+  }
+</style>
